@@ -162,7 +162,7 @@ try {
     $bgExists = Test-Path $bgKey
     
     if ($folderExists -and $bgExists) {
-        Write-Log "✓ Installation completed successfully!"
+        Write-Log "[OK] Installation completed successfully!"
         Write-Log ""
         Write-Log "Right-click any folder or folder background to see 'OpenCode Here'"
         Write-Log "Note: You may need to restart Windows Explorer or reboot for changes to take effect"
