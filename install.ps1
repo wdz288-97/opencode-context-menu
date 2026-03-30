@@ -86,28 +86,28 @@ try {
                 if ($openCodePath -match '\.ps1$') {
                     $command = "wt.exe new-tab -d `"%V\.`" powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`""
                 } else {
-                    $command = "wt.exe new-tab -d `"%V\.`" cmd.exe /k call `"$openCodePath`""
+                    $command = "wt.exe new-tab cmd.exe /k `"pushd `"%V\.`" && call `"$openCodePath`"`""
                 }
                 $icon = "powershell.exe,0" 
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
                 if ($openCodePath -match '\.ps1$') {
-                    $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+                    $command = "cmd.exe /c `"pushd `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
                 } else {
-                    $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
+                    $command = "cmd.exe /k `"pushd `"%V\.`" && call `"$openCodePath`"`""
                 }
                 $icon = "powershell.exe,0"
             }
         }
         'cmd' {
-            $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
+            $command = "cmd.exe /k `"pushd `"%V\.`" && call `"$openCodePath`"`""
             $icon = "cmd.exe,0"
         }
         'powershell' {
             if ($openCodePath -match '\.ps1$') {
-                $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+                $command = "cmd.exe /c `"pushd `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
             } else {
-                $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
+                $command = "cmd.exe /k `"pushd `"%V\.`" && call `"$openCodePath`"`""
             }
             $icon = "powershell.exe,0"
         }
