@@ -37,7 +37,7 @@ try {
     
     if (Test-Path $folderKey) {
         Remove-Item -Path $folderKey -Recurse -Force -ErrorAction Stop
-        Write-Log "  ✓ Folder context menu removed"
+        Write-Log "  [OK] Folder context menu removed"
         $found = $true
     } else {
         Write-Log "  (Folder context menu not found - already clean)"
@@ -49,7 +49,7 @@ try {
     
     if (Test-Path $bgKey) {
         Remove-Item -Path $bgKey -Recurse -Force -ErrorAction Stop
-        Write-Log "  ✓ Background context menu removed"
+        Write-Log "  [OK] Background context menu removed"
         $found = $true
     } else {
         Write-Log "  (Background context menu not found - already clean)"
@@ -58,7 +58,7 @@ try {
     Write-Log ""
     
     if ($found) {
-        Write-Log "✓ Uninstall completed successfully!"
+        Write-Log "[OK] Uninstall completed successfully!"
         Write-Log ""
         Write-Log "Note: You may need to restart Windows Explorer or reboot for changes to take effect"
     } else {

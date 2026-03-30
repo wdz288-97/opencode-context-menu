@@ -19,14 +19,14 @@ Add "OpenCode Here" to your Windows Explorer right-click context menu. Launch Op
 
 ### Quick Install (Recommended)
 
-1. Download the latest release
+1. Download or clone this repository
 2. Double-click `install.bat`
 3. Done! Right-click any folder to see "OpenCode Here"
 
 ### Manual Install
 
 ```powershell
-# Run PowerShell as administrator
+# Run PowerShell
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
@@ -60,7 +60,7 @@ On Windows 11, the context menu entry appears in "Show more options" (the classi
 ## Uninstallation
 
 ```powershell
-# Run PowerShell as administrator
+# Run PowerShell
 powershell -ExecutionPolicy Bypass -File uninstall.ps1
 ```
 
@@ -74,10 +74,6 @@ powershell -ExecutionPolicy Bypass -File uninstall.ps1
    ```powershell
    Test-Path "HKCU:\Software\Classes\Directory\shell\OpenCode"
    ```
-
-### "Access denied" error
-
-Run PowerShell as Administrator. Right-click PowerShell → "Run as administrator"
 
 ### Windows 11: Entry not in new menu
 
