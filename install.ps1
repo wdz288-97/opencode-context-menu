@@ -19,14 +19,12 @@ function Write-Log {
     Write-Host $Message
 }
 
-# Check if running as Admin to prevent the HKCU trap
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+# ALways use HKCU. The HKCU + Admin trap is avoided because install.bat 
+# no longer requests elevation. If a user manually elevates this script,
+# they are installing it for the Admin account, which is their choice.
+# We do NOT use HKLM because we cannot guarantee standard users have read 
+# access to the Admin's AppData where npm installs global packages.
 $registryRoot = "HKCU:"
-
-if ($isAdmin) {
-    Write-Log "WARNING: Running as Administrator. Installing for ALL users (HKLM) instead of current user to prevent registry mismatch."
-    $registryRoot = "HKLM:"
-}
 
 function Rollback {
     Write-Log "Performing rollback..."
@@ -38,9 +36,8 @@ function Rollback {
 try {
     Write-Log "=== OpenCode Context Menu Installer ==="
     Write-Log "Terminal mode: $Terminal"
-    Write-Log "Registry root: $registryRoot"
     
-    # Base detection of OpenCode
+    # Detect OpenCode path
     $basePath = (Get-Command opencode -ErrorAction SilentlyContinue).Source
     
     if (-not $basePath) {
@@ -72,7 +69,7 @@ try {
         elseif (Test-Path "$openCodeRawPath.bat") { $openCodePath = "$openCodeRawPath.bat" }
         else { throw "Could not find .cmd or .bat version of OpenCode required for Command Prompt." }
     } else {
-        # PowerShell and Windows Terminal (which defaults to PS) prefer .ps1, fallback to .cmd
+        # PowerShell and Windows Terminal prefer .ps1, fallback to .cmd
         if (Test-Path "$openCodeRawPath.ps1") { $openCodePath = "$openCodeRawPath.ps1" }
         elseif (Test-Path "$openCodeRawPath.cmd") { $openCodePath = "$openCodeRawPath.cmd" }
         else { throw "Could not find executable version of OpenCode." }
@@ -81,24 +78,35 @@ try {
     Write-Log "Using OpenCode executable: $openCodePath"
     
     # Build command injecting the EXACT path and safely escaping %V
-    # We use arguments for PowerShell to avoid the trailing backslash bug (e.g. C:\")
+    # We use "%V\." which safely resolves to "C:\." for drive roots, avoiding the escaped quote bug!
     switch ($Terminal) {
         'wt' {
             if (Get-Command wt -ErrorAction SilentlyContinue) {
-                $command = 'wt.exe new-tab -d "%V" "' + $openCodePath + '"'
+                # Force powershell execution inside wt so .ps1 files don't open in Notepad if CMD is default profile
+                if ($openCodePath -match '\.ps1$') {
+                    $command = 'wt.exe new-tab -d "%V\." powershell.exe -NoExit -File "' + $openCodePath + '"'
+                } else {
+                    $command = 'wt.exe new-tab -d "%V\." "' + $openCodePath + '"'
+                }
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = 'powershell.exe -NoExit -WindowStyle Hidden -Command "& { Set-Location -LiteralPath $args[0]; & $args[1] }" "%V" "' + $openCodePath + '"'
+                $command = 'powershell.exe -NoExit -Command "Set-Location -LiteralPath ''%V\.''; & ''''"'' + $openCodePath + ''"''''"'
             }
         }
         'cmd' {
-            # CMD requires standard quotes, no backslash escaping
-            $command = 'cmd.exe /k "cd /d "%V" && "' + $openCodePath + '""'
+            # CMD requires standard quotes, "%V\." prevents drive root crash
+            $command = 'cmd.exe /k "cd /d "%V\." && "' + $openCodePath + '""'
         }
         'powershell' {
-            # PowerShell with argument passing to handle C:\ trailing slash cleanly
-            $command = 'powershell.exe -NoExit -WindowStyle Hidden -Command "& { Set-Location -LiteralPath $args[0]; & $args[1] }" "%V" "' + $openCodePath + '"'
+            # PowerShell: NO -WindowStyle Hidden! OpenCode is interactive.
+            # Use '%V\.' and single quotes for the path to avoid all parsing nightmares.
+            $command = 'powershell.exe -NoExit -Command "Set-Location -LiteralPath ''%V\.''; & ''''"'' + $openCodePath + ''"''''"'
         }
+    }
+    
+    # Clean up the weird string concatenation for PowerShell
+    if ($Terminal -eq 'powershell' -or ($Terminal -eq 'wt' -and -not (Get-Command wt -ErrorAction SilentlyContinue))) {
+        $command = "powershell.exe -NoExit -Command `"Set-Location -LiteralPath '%V\.'; & '$openCodePath'`""
     }
     
     Write-Log "Command template: $command"
