@@ -86,7 +86,7 @@ try {
                 if ($openCodePath -match '\.ps1$') {
                     $command = "wt.exe new-tab -d `"%V\.`" powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`""
                 } else {
-                    $command = "wt.exe new-tab cmd.exe /k `"pushd `"%V\.`" && call `"$openCodePath`"`""
+                    $command = "wt.exe new-tab cmd.exe /k `"pushd \`"%V\.\`" && call \`"$openCodePath\`"`""
                 }
                 $icon = "powershell.exe,0" 
             } else {
