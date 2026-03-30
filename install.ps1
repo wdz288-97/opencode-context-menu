@@ -91,7 +91,11 @@ try {
                 $icon = "powershell.exe,0" 
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+                if ($openCodePath -match '\.ps1$') {
+                    $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+                } else {
+                    $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
+                }
                 $icon = "powershell.exe,0"
             }
         }
@@ -100,7 +104,11 @@ try {
             $icon = "cmd.exe,0"
         }
         'powershell' {
-            $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+            if ($openCodePath -match '\.ps1$') {
+                $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
+            } else {
+                $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
+            }
             $icon = "powershell.exe,0"
         }
     }
