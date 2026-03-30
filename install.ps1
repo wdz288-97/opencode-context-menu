@@ -28,6 +28,7 @@ function Rollback {
     Write-Log "Performing rollback..."
     Remove-Item -Path "$registryRoot\Software\Classes\Directory\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "$registryRoot\Software\Classes\Directory\Background\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$registryRoot\Software\Classes\Drive\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
     Write-Log "Rollback complete"
 }
 
@@ -76,7 +77,7 @@ try {
     Write-Log "Using OpenCode executable: $openCodePath"
     
     # Build command injecting the EXACT path and safely escaping %V
-    $icon = ""
+    # We use "%V\." which safely resolves to "C:\." for drive roots, avoiding the escaped quote bug!
     switch ($Terminal) {
         'wt' {
             if (Get-Command wt -ErrorAction SilentlyContinue) {
@@ -85,10 +86,11 @@ try {
                 } else {
                     $command = "wt.exe new-tab -d `"%V\.`" `"$openCodePath`""
                 }
-                $icon = "wt.exe,0"
+                # wt.exe cannot yield an icon. Use powershell icon as fallback.
+                $icon = "powershell.exe,0" 
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V`" `"$openCodePath`""
+                $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V\.`" `"$openCodePath`""
                 $icon = "powershell.exe,0"
             }
         }
@@ -97,7 +99,7 @@ try {
             $icon = "cmd.exe,0"
         }
         'powershell' {
-            $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V`" `"$openCodePath`""
+            $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V\.`" `"$openCodePath`""
             $icon = "powershell.exe,0"
         }
     }
@@ -128,6 +130,18 @@ try {
     $bgCommand = "$bgKey\command"
     New-Item -Path $bgCommand -Force -ErrorAction Stop | Out-Null
     Set-ItemProperty -Path $bgCommand -Name "(Default)" -Value $command -ErrorAction Stop
+    
+    # Create drive context menu (for right-clicking C:\, D:\ in This PC)
+    $driveKey = "$registryRoot\Software\Classes\Drive\shell\OpenCode"
+    if (Test-Path $driveKey) { Remove-Item -Path $driveKey -Recurse -Force }
+    
+    New-Item -Path $driveKey -Force -ErrorAction Stop | Out-Null
+    Set-ItemProperty -Path $driveKey -Name "(Default)" -Value "OpenCode Here" -ErrorAction Stop
+    Set-ItemProperty -Path $driveKey -Name "Icon" -Value $icon -ErrorAction Stop
+    
+    $driveCommand = "$driveKey\command"
+    New-Item -Path $driveCommand -Force -ErrorAction Stop | Out-Null
+    Set-ItemProperty -Path $driveCommand -Name "(Default)" -Value $command -ErrorAction Stop
     
     Write-Log "[OK] Installation completed successfully!"
     Write-Host "`nInstallation successful!" -ForegroundColor Green

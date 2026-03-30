@@ -1,4 +1,3 @@
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Uninstalls "OpenCode Here" context menu from Windows Explorer
@@ -24,6 +23,8 @@ function Write-Log {
     Write-Host $Message
 }
 
+$registryRoot = "HKCU:"
+
 try {
     Write-Log "=== OpenCode Context Menu Uninstaller ==="
     Write-Log "Log file: $LogFile"
@@ -33,7 +34,7 @@ try {
     
     # Remove folder context menu
     Write-Log "Removing folder context menu entry..."
-    $folderKey = "HKCU:\Software\Classes\Directory\shell\OpenCode"
+    $folderKey = "$registryRoot\Software\Classes\Directory\shell\OpenCode"
     
     if (Test-Path $folderKey) {
         Remove-Item -Path $folderKey -Recurse -Force -ErrorAction Stop
@@ -45,7 +46,7 @@ try {
     
     # Remove background context menu
     Write-Log "Removing background context menu entry..."
-    $bgKey = "HKCU:\Software\Classes\Directory\Background\shell\OpenCode"
+    $bgKey = "$registryRoot\Software\Classes\Directory\Background\shell\OpenCode"
     
     if (Test-Path $bgKey) {
         Remove-Item -Path $bgKey -Recurse -Force -ErrorAction Stop
@@ -53,6 +54,18 @@ try {
         $found = $true
     } else {
         Write-Log "  (Background context menu not found - already clean)"
+    }
+    
+    # Remove drive context menu
+    Write-Log "Removing drive context menu entry..."
+    $driveKey = "$registryRoot\Software\Classes\Drive\shell\OpenCode"
+    
+    if (Test-Path $driveKey) {
+        Remove-Item -Path $driveKey -Recurse -Force -ErrorAction Stop
+        Write-Log "  [OK] Drive context menu removed"
+        $found = $true
+    } else {
+        Write-Log "  (Drive context menu not found - already clean)"
     }
     
     Write-Log ""
