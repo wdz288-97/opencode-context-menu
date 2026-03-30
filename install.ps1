@@ -19,68 +19,92 @@ function Write-Log {
     Write-Host $Message
 }
 
+# Check if running as Admin to prevent the HKCU trap
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$registryRoot = "HKCU:"
+
+if ($isAdmin) {
+    Write-Log "WARNING: Running as Administrator. Installing for ALL users (HKLM) instead of current user to prevent registry mismatch."
+    $registryRoot = "HKLM:"
+}
+
 function Rollback {
     Write-Log "Performing rollback..."
-    Remove-Item -Path "HKCU:\Software\Classes\Directory\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "HKCU:\Software\Classes\Directory\Background\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$registryRoot\Software\Classes\Directory\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$registryRoot\Software\Classes\Directory\Background\shell\OpenCode" -Recurse -Force -ErrorAction SilentlyContinue
     Write-Log "Rollback complete"
 }
 
 try {
     Write-Log "=== OpenCode Context Menu Installer ==="
     Write-Log "Terminal mode: $Terminal"
+    Write-Log "Registry root: $registryRoot"
     
-    # Detect OpenCode path
-    $openCodePath = (Get-Command opencode -ErrorAction SilentlyContinue).Source
+    # Base detection of OpenCode
+    $basePath = (Get-Command opencode -ErrorAction SilentlyContinue).Source
     
-    if (-not $openCodePath) {
+    if (-not $basePath) {
         $possiblePaths = @(
             "$env:APPDATA\npm\opencode.cmd",
             "$env:LOCALAPPDATA\npm\opencode.cmd",
             "$env:USERPROFILE\AppData\Roaming\npm\opencode.cmd",
-            "$env:USERPROFILE\opencode.bat",
-            "$env:USERPROFILE\AppData\Roaming\npm\opencode.ps1"
+            "$env:USERPROFILE\opencode.bat"
         )
         foreach ($path in $possiblePaths) {
             if (Test-Path $path) {
-                $openCodePath = $path
+                $basePath = $path
                 break
             }
         }
     }
     
-    if (-not $openCodePath) {
+    if (-not $basePath) {
         throw "OpenCode not found. Please install OpenCode first."
     }
+
+    # Strip extension to get the raw path
+    $openCodeRawPath = $basePath -replace '\.(cmd|bat|ps1)$', ''
     
-    if (-not ($openCodePath -match '\.(cmd|bat|ps1)$')) {
-        if (Test-Path "$openCodePath.cmd") { $openCodePath = "$openCodePath.cmd" }
-        elseif (Test-Path "$openCodePath.ps1") { $openCodePath = "$openCodePath.ps1" }
+    # Resolve the EXACT extension needed for the chosen terminal
+    $openCodePath = ""
+    if ($Terminal -eq 'cmd') {
+        if (Test-Path "$openCodeRawPath.cmd") { $openCodePath = "$openCodeRawPath.cmd" }
+        elseif (Test-Path "$openCodeRawPath.bat") { $openCodePath = "$openCodeRawPath.bat" }
+        else { throw "Could not find .cmd or .bat version of OpenCode required for Command Prompt." }
+    } else {
+        # PowerShell and Windows Terminal (which defaults to PS) prefer .ps1, fallback to .cmd
+        if (Test-Path "$openCodeRawPath.ps1") { $openCodePath = "$openCodeRawPath.ps1" }
+        elseif (Test-Path "$openCodeRawPath.cmd") { $openCodePath = "$openCodeRawPath.cmd" }
+        else { throw "Could not find executable version of OpenCode." }
     }
     
-    Write-Log "Using OpenCode path: $openCodePath"
+    Write-Log "Using OpenCode executable: $openCodePath"
     
     # Build command injecting the EXACT path and safely escaping %V
+    # We use arguments for PowerShell to avoid the trailing backslash bug (e.g. C:\")
     switch ($Terminal) {
         'wt' {
             if (Get-Command wt -ErrorAction SilentlyContinue) {
-                $command = "wt.exe new-tab -d `"%V`" `"$openCodePath`""
+                $command = 'wt.exe new-tab -d "%V" "' + $openCodePath + '"'
             } else {
-                $command = "powershell.exe -NoExit -Command `"Set-Location -LiteralPath \`"%V\`"; & \`"$openCodePath\`"`""
+                Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
+                $command = 'powershell.exe -NoExit -WindowStyle Hidden -Command "& { Set-Location -LiteralPath $args[0]; & $args[1] }" "%V" "' + $openCodePath + '"'
             }
         }
         'cmd' {
-            $command = "cmd.exe /c start cmd /k `"cd /d \`"%V\`" && \`"$openCodePath\`"`""
+            # CMD requires standard quotes, no backslash escaping
+            $command = 'cmd.exe /k "cd /d "%V" && "' + $openCodePath + '""'
         }
         'powershell' {
-            $command = "powershell.exe -NoExit -Command `"Set-Location -LiteralPath \`"%V\`"; & \`"$openCodePath\`"`""
+            # PowerShell with argument passing to handle C:\ trailing slash cleanly
+            $command = 'powershell.exe -NoExit -WindowStyle Hidden -Command "& { Set-Location -LiteralPath $args[0]; & $args[1] }" "%V" "' + $openCodePath + '"'
         }
     }
     
     Write-Log "Command template: $command"
     
     # Create folder context menu
-    $folderKey = "HKCU:\Software\Classes\Directory\shell\OpenCode"
+    $folderKey = "$registryRoot\Software\Classes\Directory\shell\OpenCode"
     if (Test-Path $folderKey) { Remove-Item -Path $folderKey -Recurse -Force }
     
     New-Item -Path $folderKey -Force -ErrorAction Stop | Out-Null
@@ -92,7 +116,7 @@ try {
     Set-ItemProperty -Path $folderCommand -Name "(Default)" -Value $command -ErrorAction Stop
     
     # Create background context menu
-    $bgKey = "HKCU:\Software\Classes\Directory\Background\shell\OpenCode"
+    $bgKey = "$registryRoot\Software\Classes\Directory\Background\shell\OpenCode"
     if (Test-Path $bgKey) { Remove-Item -Path $bgKey -Recurse -Force }
     
     New-Item -Path $bgKey -Force -ErrorAction Stop | Out-Null
@@ -104,12 +128,14 @@ try {
     Set-ItemProperty -Path $bgCommand -Name "(Default)" -Value $command -ErrorAction Stop
     
     Write-Log "[OK] Installation completed successfully!"
+    Write-Host "`nInstallation successful!" -ForegroundColor Green
     Write-Host "Right-click any folder or folder background to see 'OpenCode Here'"
     Write-Host "To uninstall, run: .\uninstall.ps1"
     exit 0
 }
 catch {
     Write-Log "ERROR: $_"
+    Write-Host "`nInstallation failed: $_" -ForegroundColor Red
     Rollback
     exit 1
 }
