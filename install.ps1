@@ -113,16 +113,6 @@ try {
             $command = 'powershell.exe -NoExit -Command "Set-Location ''%V''; opencode"'
         }
     }
-        }
-        'cmd' {
-            # Classic Command Prompt
-            $command = "cmd.exe /c start cmd /k `""cd /d `"%V`" && opencode`"""
-        }
-        'powershell' {
-            # PowerShell
-            $command = "powershell.exe -NoExit -Command `"Set-Location '\"%V\"'; opencode`""
-        }
-    }
     
     Write-Log "Command template: $command"
     Write-Log ""
