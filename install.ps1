@@ -22,6 +22,8 @@ function Write-Log {
 # ALways use HKCU. The HKCU + Admin trap is avoided because install.bat 
 # no longer requests elevation. If a user manually elevates this script,
 # they are installing it for the Admin account, which is their choice.
+# We do NOT use HKLM because we cannot guarantee standard users have read 
+# access to the Admin's AppData where npm installs global packages.
 $registryRoot = "HKCU:"
 
 function Rollback {
@@ -77,29 +79,28 @@ try {
     Write-Log "Using OpenCode executable: $openCodePath"
     
     # Build command injecting the EXACT path and safely escaping %V
-    # We use "%V\." which safely resolves to "C:\." for drive roots, avoiding the escaped quote bug!
+    $icon = ""
     switch ($Terminal) {
         'wt' {
             if (Get-Command wt -ErrorAction SilentlyContinue) {
                 if ($openCodePath -match '\.ps1$') {
                     $command = "wt.exe new-tab -d `"%V\.`" powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`""
                 } else {
-                    $command = "wt.exe new-tab -d `"%V\.`" `"$openCodePath`""
+                    $command = "wt.exe new-tab -d `"%V\.`" cmd.exe /k call `"$openCodePath`""
                 }
-                # wt.exe cannot yield an icon. Use powershell icon as fallback.
                 $icon = "powershell.exe,0" 
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V\.`" `"$openCodePath`""
+                $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
                 $icon = "powershell.exe,0"
             }
         }
         'cmd' {
-            $command = "cmd.exe /k `"cd /d `"%V\.`" && `"$openCodePath`"`""
+            $command = "cmd.exe /k `"cd /d `"%V\.`" && call `"$openCodePath`"`""
             $icon = "cmd.exe,0"
         }
         'powershell' {
-            $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V\.`" `"$openCodePath`""
+            $command = "cmd.exe /c `"cd /d `"%V\.`" && powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`"`""
             $icon = "powershell.exe,0"
         }
     }
