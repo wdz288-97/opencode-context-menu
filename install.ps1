@@ -93,15 +93,26 @@ try {
     Write-Log ""
     
     # Build command based on terminal choice
+    # Note: %V is a registry placeholder, not a PowerShell variable
     switch ($Terminal) {
         'wt' {
             # Windows Terminal - best experience
             if (Get-Command wt -ErrorAction SilentlyContinue) {
-                $command = "wt.exe new-tab -d `"`"%V`"`" opencode"
+                $command = 'wt.exe new-tab -d "%V" opencode'
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = "powershell.exe -NoExit -Command `"Set-Location '\"%V\"'; opencode`""
+                $command = 'powershell.exe -NoExit -Command "Set-Location ''%V''; opencode"'
             }
+        }
+        'cmd' {
+            # Classic Command Prompt
+            $command = 'cmd.exe /c start cmd /k "cd /d "%V" && opencode"'
+        }
+        'powershell' {
+            # PowerShell
+            $command = 'powershell.exe -NoExit -Command "Set-Location ''%V''; opencode"'
+        }
+    }
         }
         'cmd' {
             # Classic Command Prompt
