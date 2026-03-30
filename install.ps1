@@ -22,8 +22,6 @@ function Write-Log {
 # ALways use HKCU. The HKCU + Admin trap is avoided because install.bat 
 # no longer requests elevation. If a user manually elevates this script,
 # they are installing it for the Admin account, which is their choice.
-# We do NOT use HKLM because we cannot guarantee standard users have read 
-# access to the Admin's AppData where npm installs global packages.
 $registryRoot = "HKCU:"
 
 function Rollback {
@@ -78,38 +76,34 @@ try {
     Write-Log "Using OpenCode executable: $openCodePath"
     
     # Build command injecting the EXACT path and safely escaping %V
-    # We use "%V\." which safely resolves to "C:\." for drive roots, avoiding the escaped quote bug!
+    $icon = ""
     switch ($Terminal) {
         'wt' {
             if (Get-Command wt -ErrorAction SilentlyContinue) {
-                # Force powershell execution inside wt so .ps1 files don't open in Notepad if CMD is default profile
                 if ($openCodePath -match '\.ps1$') {
-                    $command = 'wt.exe new-tab -d "%V\." powershell.exe -NoExit -File "' + $openCodePath + '"'
+                    $command = "wt.exe new-tab -d `"%V\.`" powershell.exe -ExecutionPolicy Bypass -NoExit -File `"$openCodePath`""
                 } else {
-                    $command = 'wt.exe new-tab -d "%V\." "' + $openCodePath + '"'
+                    $command = "wt.exe new-tab -d `"%V\.`" `"$openCodePath`""
                 }
+                $icon = "wt.exe,0"
             } else {
                 Write-Log "WARNING: Windows Terminal not found, falling back to PowerShell"
-                $command = 'powershell.exe -NoExit -Command "Set-Location -LiteralPath ''%V\.''; & ''''"'' + $openCodePath + ''"''''"'
+                $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V`" `"$openCodePath`""
+                $icon = "powershell.exe,0"
             }
         }
         'cmd' {
-            # CMD requires standard quotes, "%V\." prevents drive root crash
-            $command = 'cmd.exe /k "cd /d "%V\." && "' + $openCodePath + '""'
+            $command = "cmd.exe /k `"cd /d `"%V\.`" && `"$openCodePath`"`""
+            $icon = "cmd.exe,0"
         }
         'powershell' {
-            # PowerShell: NO -WindowStyle Hidden! OpenCode is interactive.
-            # Use '%V\.' and single quotes for the path to avoid all parsing nightmares.
-            $command = 'powershell.exe -NoExit -Command "Set-Location -LiteralPath ''%V\.''; & ''''"'' + $openCodePath + ''"''''"'
+            $command = "powershell.exe -ExecutionPolicy Bypass -NoExit -Command `"& { Set-Location -LiteralPath `$args[0]; & `$args[1] }`" `"%V`" `"$openCodePath`""
+            $icon = "powershell.exe,0"
         }
-    }
-    
-    # Clean up the weird string concatenation for PowerShell
-    if ($Terminal -eq 'powershell' -or ($Terminal -eq 'wt' -and -not (Get-Command wt -ErrorAction SilentlyContinue))) {
-        $command = "powershell.exe -NoExit -Command `"Set-Location -LiteralPath '%V\.'; & '$openCodePath'`""
     }
     
     Write-Log "Command template: $command"
+    Write-Log "Icon: $icon"
     
     # Create folder context menu
     $folderKey = "$registryRoot\Software\Classes\Directory\shell\OpenCode"
@@ -117,7 +111,7 @@ try {
     
     New-Item -Path $folderKey -Force -ErrorAction Stop | Out-Null
     Set-ItemProperty -Path $folderKey -Name "(Default)" -Value "OpenCode Here" -ErrorAction Stop
-    Set-ItemProperty -Path $folderKey -Name "Icon" -Value "powershell.exe,0" -ErrorAction Stop
+    Set-ItemProperty -Path $folderKey -Name "Icon" -Value $icon -ErrorAction Stop
     
     $folderCommand = "$folderKey\command"
     New-Item -Path $folderCommand -Force -ErrorAction Stop | Out-Null
@@ -129,7 +123,7 @@ try {
     
     New-Item -Path $bgKey -Force -ErrorAction Stop | Out-Null
     Set-ItemProperty -Path $bgKey -Name "(Default)" -Value "OpenCode Here" -ErrorAction Stop
-    Set-ItemProperty -Path $bgKey -Name "Icon" -Value "powershell.exe,0" -ErrorAction Stop
+    Set-ItemProperty -Path $bgKey -Name "Icon" -Value $icon -ErrorAction Stop
     
     $bgCommand = "$bgKey\command"
     New-Item -Path $bgCommand -Force -ErrorAction Stop | Out-Null
