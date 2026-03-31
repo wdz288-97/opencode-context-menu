@@ -55,7 +55,27 @@ After installation:
 
 ### Windows 11 Note
 
-On Windows 11, the context menu entry appears in "Show more options" (the classic menu). This is a limitation of the simple registry-based approach.
+On Windows 11, the context menu entry appears in **"Show more options"** (the classic menu). This is expected behavior for registry-based context menus in Windows 11.
+
+To show "OpenCode Here" directly in the main context menu without clicking "Show more options":
+
+```powershell
+# Run as Administrator in PowerShell
+reg add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
+
+# Then restart Explorer
+taskkill /f /im explorer.exe && start explorer
+```
+
+To revert to the default Windows 11 menu:
+
+```powershell
+# Run as Administrator in PowerShell
+reg delete "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" /f
+
+# Then restart Explorer
+taskkill /f /im explorer.exe && start explorer
+```
 
 ## Uninstallation
 
@@ -75,16 +95,13 @@ powershell -ExecutionPolicy Bypass -File uninstall.ps1
    Test-Path "HKCU:\Software\Classes\Directory\shell\OpenCode"
    ```
 
-### Windows 11: Entry not in new menu
-
-Windows 11 has a new context menu system. Simple registry entries appear in "Show more options". This is expected behavior.
-
 ## How It Works
 
-The installer creates two registry entries:
+The installer creates three registry entries:
 
 - `HKCU\Software\Classes\Directory\shell\OpenCode` - For folder right-clicks
-- `HKCU\Software\Classes\Directory\Background\shell\OpenCode` - For background right-clicks
+- `HKCU\Software\Classes\Directory\Background\shell\OpenCode` - For folder background right-clicks
+- `HKCU\Software\Classes\Drive\shell\OpenCode` - For drive right-clicks (e.g., This PC)
 
 Both point to the OpenCode executable with the selected directory as the working folder.
 
